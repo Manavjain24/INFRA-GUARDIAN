@@ -1,52 +1,66 @@
-# Prerequisites
-*.d
+#include <SoftwareSerial.h>
 
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
+#define SIM800_TX 3  // Connect SIM800L TX to Arduino pin 3  
+#define SIM800_RX 2  // Connect SIM800L RX to Arduino pin 2
+SoftwareSerial sim800l(SIM800_RX, SIM800_TX);
 
-# Linker output
-*.ilk
-*.map
-*.exp
+const int LDR_PIN = 7; // Digital pin connected to LDR sensor's D0 pin
+const int BUZZER_PIN = 11; // Buzzer connected to digital pin 11
+const char phone_number[] = "+919755301660"; // Replace with the recipient's number
 
-# Precompiled Headers
-*.gch
-*.pch
+void setup() {
+    Serial.begin(9600);
+    sim800l.begin(9600);
+    pinMode(LDR_PIN, INPUT);
+    pinMode(BUZZER_PIN, OUTPUT);
+    digitalWrite(BUZZER_PIN, LOW); // Ensure buzzer is OFF initially
+    
+    delay(2000);
+    Serial.println("Initializing SIM800L...");
+    
+    // Check if SIM800L is responding
+    sim800l.println("AT");
+    delay(2000);
+    if (sim800l.available()) {
+        String response = "";
+        while (sim800l.available()) {
+            response += (char)sim800l.read();
+        }
+        Serial.println("SIM800L Response: " + response);
+    } else {
+        Serial.println("No response from SIM800L. Check connections.");
+    }
+}
 
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
+void loop() {
+    int ldrState = digitalRead(LDR_PIN); // Read LDR sensor state
+    Serial.print("LDR Sensor Value: ");
+    Serial.println(ldrState);
+    
+    if (ldrState == HIGH) { // If light is detected (thief detected)
+        Serial.println("Thief Detected - Activating Buzzer and Sending SMS");
+        digitalWrite(BUZZER_PIN, HIGH); // Turn ON Buzzer
+        sendSMS();
+        delay(5000); // Buzzer stays on for 5 seconds
+        digitalWrite(BUZZER_PIN, LOW); // Turn OFF Buzzer
+    }
+    
+    delay(1000); // Wait 1000ms before next reading
+}
 
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
-
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
-
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
+void sendSMS() {
+    Serial.println("Sending SMS...");
+    sim800l.println("AT"); // Check if SIM800L is responding
+    delay(7000);
+    sim800l.println("AT+CMGF=1"); // Set SMS mode to text
+    delay(7000);
+    sim800l.print("AT+CMGS=\"");
+    sim800l.print(phone_number);
+    sim800l.println("\"");
+    delay(7000);
+    sim800l.println("Alert! Thief Detected."); // Your SMS message
+    delay(7000);
+    sim800l.write(26); // Send SMS (CTRL+Z in ASCII)
+    delay(10000);
+    Serial.println("SMS Sent!");
+}
